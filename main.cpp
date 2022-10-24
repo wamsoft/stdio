@@ -1,10 +1,17 @@
+#include <windows.h>
+#include <ncbind.hpp>
+
 #include <stdio.h>
 #include <iostream>
 #include <string>
-#include "ncbind/ncbind.hpp"
+
 
 struct Stdio
 {
+	static bool isConsoleStdin;
+	static bool isConsoleStdout;
+	static bool isConsoleStderr;
+
 	static int getState() {
 		int state = 0;
 		if (_fileno(stdin)  >= 0) state |= 0x01;
@@ -13,7 +20,16 @@ struct Stdio
 		return state;
 	}
 
-	// ƒRƒ“ƒ\[ƒ‹‚ÆÚ‘±
+	static void initLocale() {
+		SetConsoleCP(CP_UTF8);
+		SetConsoleOutputCP(CP_UTF8);
+		auto locale = std::locale(".UTF-8");
+		std::wcin.imbue(locale);
+		std::wcout.imbue(locale);
+		std::wcerr.imbue(locale);
+	}
+
+	// ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã¨æŽ¥ç¶š
 	static tjs_error TJS_INTF_METHOD attach(tTJSVariant *result,
 											tjs_int numparams,
 											tTJSVariant **param,
@@ -21,7 +37,7 @@ struct Stdio
 		int state = numparams > 0 ? *param[0] : 0;
 		bool ret = true;
 		if (state == 0) {
-			//VS2012ˆÈ~‚Å‚±‚Ì‹Lq‚Å³‚µ‚­”»’è‚Å‚«‚È‚¢Bƒ‰ƒ“ƒ^ƒCƒ€‚ÌƒoƒO‚ÆŽv‚í‚ê‚é
+			//VS2012ä»¥é™ã§ã“ã®è¨˜è¿°ã§æ­£ã—ãåˆ¤å®šã§ããªã„ã€‚ãƒ©ãƒ³ã‚¿ã‚¤ãƒ ã®ãƒã‚°ã¨æ€ã‚ã‚Œã‚‹
 			//if (_fileno(stdin)  == -2) state |= 0x01;
 			//if (_fileno(stdout) == -2) state |= 0x02;
 			//if (_fileno(stderr) == -2) state |= 0x04;
@@ -29,19 +45,22 @@ struct Stdio
 			if (GetStdHandle(STD_OUTPUT_HANDLE) == 0) state |= 0x02;
 			if (GetStdHandle(STD_ERROR_HANDLE) == 0) state |= 0x04;
 		}
-		// Ú‘±æ‚ª–³‚¢ê‡‚ÍƒRƒ“ƒ\[ƒ‹‚ðŠJ‚¢‚Ä‚»‚±‚ÉÚ‘±‚·‚é
+		// æŽ¥ç¶šå…ˆãŒç„¡ã„å ´åˆã¯ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã‚’é–‹ã„ã¦ãã“ã«æŽ¥ç¶šã™ã‚‹
 		if (state != 0) {
 			typedef BOOL (WINAPI* AttachConsoleFunc)(DWORD dwProcessId);
 			HINSTANCE hDLL = LoadLibrary(L"kernel32.dll");
 			AttachConsoleFunc AttachConsole = (AttachConsoleFunc)GetProcAddress(hDLL, "AttachConsole");
 			if (AttachConsole && (*AttachConsole)(-1)) {
-				if ((state & 0x01)) freopen("CON", "r", stdin); 
-				if ((state & 0x02)) freopen("CON", "w", stdout);
-				if ((state & 0x04)) freopen("CON", "w", stderr);
+				if ((state & 0x01)) { freopen("CON", "r", stdin); isConsoleStdin = true; }
+				if ((state & 0x02)) { freopen("CON", "w", stdout); isConsoleStdout = true; }
+				if ((state & 0x04)) { freopen("CON", "w", stderr); isConsoleStderr = true; }
 			} else {
 				ret = false;
 			}
 			FreeLibrary(hDLL);
+		}
+		if (ret) {
+			initLocale();
 		}
 		if (result) {
 			*result = ret;
@@ -49,7 +68,7 @@ struct Stdio
 		return TJS_S_OK;
 	}
 
-	// ƒRƒ“ƒ\[ƒ‹‚ÌŠ„‚è“–‚Ä
+	// ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã®å‰²ã‚Šå½“ã¦
 	static tjs_error TJS_INTF_METHOD alloc(tTJSVariant *result,
 										   tjs_int numparams,
 										   tTJSVariant **param,
@@ -61,15 +80,18 @@ struct Stdio
 			if (_fileno(stdout) == -2) state |= 0x02;
 			if (_fileno(stderr) == -2) state |= 0x04;
 		}
-		// Ú‘±æ‚ª–³‚¢ê‡‚ÍƒRƒ“ƒ\[ƒ‹‚ðŠJ‚¢‚Ä‚»‚±‚ÉÚ‘±‚·‚é
+		// æŽ¥ç¶šå…ˆãŒç„¡ã„å ´åˆã¯ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã‚’é–‹ã„ã¦ãã“ã«æŽ¥ç¶šã™ã‚‹
 		if (state != 0) {
 			if (::AllocConsole()) {
-				if ((state & 0x01)) freopen("CON", "r", stdin); 
-				if ((state & 0x02)) freopen("CON", "w", stdout);
-				if ((state & 0x04)) freopen("CON", "w", stderr);
+				if ((state & 0x01)) { freopen("CON", "r", stdin); isConsoleStdin = true; }
+				if ((state & 0x02)) { freopen("CON", "w", stdout); isConsoleStdout = true; }
+				if ((state & 0x04)) { freopen("CON", "w", stderr); isConsoleStderr = true; }
 			} else {
 				ret = false;
 			}
+		}
+		if (ret) {
+			initLocale();
 		}
 		if (result) {
 			*result = ret;
@@ -88,101 +110,76 @@ struct Stdio
 		return TJS_S_OK;
 	}
 	
-	// •W€“ü—Í‚©‚çƒeƒLƒXƒg‚ð“Ç‚Ýž‚Þ
+	// æ¨™æº–å…¥åŠ›ã‹ã‚‰ãƒ†ã‚­ã‚¹ãƒˆã‚’èª­ã¿è¾¼ã‚€
 	static tjs_error TJS_INTF_METHOD in(tTJSVariant *result,
 										tjs_int numparams,
 										tTJSVariant **param,
 										iTJSDispatch2 *objthis) {
 		if (result) {
-			bool utf8 = numparams> 0 && (int)*param[0] != 0;
-			std::string str;
-			std::getline(std::cin, str);
-			if (utf8) {
-				const char *s = str.c_str();
-				tjs_int len = TVPUtf8ToWideCharString(s, NULL);
-				if (len > 0) {
-					tjs_char *dat = new tjs_char[len+1];
-					try {
-						TVPUtf8ToWideCharString(s, dat);
-						dat[len] = TJS_W('\0');
-					}
-					catch(...) {
-						delete [] dat;
-						throw;
-					}
-					*result = ttstr(dat);
-					delete [] dat;
-				}				
+			std::wstring str;
+			if (isConsoleStdin) {
+				// windows ã®ãƒã‚°å¯¾ç­–ã€‚ãªãœã‹ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã ã¨ stdin ã‹ã‚‰ UnicodeãŒã‚ˆã‚ãªã„
+				wchar_t buf[2048+1];
+				DWORD readNum;
+				::ReadConsoleW(GetStdHandle(STD_INPUT_HANDLE), buf, 2048, &readNum, NULL);
+				if (readNum > 0) {
+					buf[readNum] = '\0';
+					str = buf;
+				}				 
 			} else {
-				*result = ttstr(str.c_str());
+				std::getline(std::wcin, str);
 			}
+			*result = ttstr(str.c_str());
 		}
 		return TJS_S_OK;
 	}
 
-	// ƒeƒLƒXƒgo—Í‰º¿‚¯ŠÖ”
+	// ãƒ†ã‚­ã‚¹ãƒˆå‡ºåŠ›ä¸‹è«‹ã‘é–¢æ•°
 	static tjs_error TJS_INTF_METHOD _out(tjs_int numparams,
 										  tTJSVariant **param,
-										  std::ostream &os) {
+										  std::wostream &wos,
+										  HANDLE handle) {
 		if (numparams > 0) {
-			bool utf8 = numparams> 1 && (int)*param[1] != 0;
 			ttstr str = *param[0];
-			if (utf8) {
-				const tjs_char *s = str.c_str();
-				tjs_int len = TVPWideCharToUtf8String(s, NULL);
-				char *dat = new char [len+1];
-				try {
-					TVPWideCharToUtf8String(s, dat);
-					dat[len] = '\0';
-				}
-				catch(...)	{
-					delete [] dat;
-					throw;
-				}
-				os << dat;
-				delete [] dat;
+			if (handle) {
+				DWORD writeNum;
+				::WriteConsoleW(handle, str.c_str(), str.length(), &writeNum, NULL);
 			} else {
-				tjs_int len = str.GetNarrowStrLen();
-				tjs_nchar *dat = new tjs_nchar[len+1];
-				try {
-					str.ToNarrowStr(dat, len+1);
-				}
-				catch(...)	{
-					delete [] dat;
-					throw;
-				} 
-				os << dat;
-				delete [] dat;
+				wos << str.c_str();
 			}
 		}
 		return TJS_S_OK;
 	}
 
-	// •W€o—Í‚ÉƒeƒLƒXƒg‚ðo—Í
+	// æ¨™æº–å‡ºåŠ›ã«ãƒ†ã‚­ã‚¹ãƒˆã‚’å‡ºåŠ›
 	static tjs_error TJS_INTF_METHOD out(tTJSVariant *result,
 										 tjs_int numparams,
 										 tTJSVariant **param,
 										 iTJSDispatch2 *objthis) {
-		return _out(numparams, param, std::cout);
+		return _out(numparams, param, std::wcout, isConsoleStdout ? GetStdHandle(STD_OUTPUT_HANDLE) : 0);
 	}
 	
-	// •W€ƒGƒ‰[o—Í‚ÉƒeƒLƒXƒg‚ðo—Í
+	// æ¨™æº–ã‚¨ãƒ©ãƒ¼å‡ºåŠ›ã«ãƒ†ã‚­ã‚¹ãƒˆã‚’å‡ºåŠ›
 	static tjs_error TJS_INTF_METHOD err(tTJSVariant *result,
 										 tjs_int numparams,
 										 tTJSVariant **param,
 										 iTJSDispatch2 *objthis) {
-		return _out(numparams, param, std::cerr);
+		return _out(numparams, param, std::wcerr, isConsoleStderr ? GetStdHandle(STD_ERROR_HANDLE) : 0);
 	}
 
-	// •W€o—Í‚ðƒtƒ‰ƒbƒVƒ…
+	// æ¨™æº–å‡ºåŠ›ã‚’ãƒ•ãƒ©ãƒƒã‚·ãƒ¥
 	static tjs_error TJS_INTF_METHOD flush(tTJSVariant *result,
 										   tjs_int numparams,
 										   tTJSVariant **param,
 										   iTJSDispatch2 *objthis) {
-		std::cout << std::flush;
+		std::wcout << std::flush;
 		return TJS_S_OK;
 	}
 };
+
+bool Stdio::isConsoleStdin = false;
+bool Stdio::isConsoleStdout = false;
+bool Stdio::isConsoleStderr = false;
 
 NCB_ATTACH_CLASS(Stdio, System) {
 	Property("stdioState", &Stdio::getState, 0);

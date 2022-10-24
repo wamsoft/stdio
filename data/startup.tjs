@@ -1,0 +1,17 @@
+Plugins.link(System.exePath + "build/x86-windows-static/Debug/stdio.dll");
+
+
+System.inform("コンソールをアタッチ");
+if (!System.attachConsole()) {
+    System.inform("attach失敗");
+    if (!System.allocConsole()) {
+        System.inform("alloc失敗");
+    }
+}
+
+
+System.stdout("入力テスト:");
+var a = System.stdin();
+System.stdout(@"出力テスト:${a}\n");
+
+System.inform("完了");
