@@ -20,9 +20,20 @@ struct Stdio
 		return state;
 	}
 
+	static UINT consoleCP;
+	static UINT consoleOutputCP;
+
+	static void doneLocale() {
+		if (consoleCP) ::SetConsoleCP(consoleCP);
+		if (consoleOutputCP) ::SetConsoleOutputCP(consoleOutputCP);		
+	}
+
 	static void initLocale() {
-		SetConsoleCP(CP_UTF8);
-		SetConsoleOutputCP(CP_UTF8);
+		consoleCP = ::GetConsoleCP();
+		consoleOutputCP = ::GetConsoleOutputCP();
+		::atexit(doneLocale);
+		::SetConsoleCP(CP_UTF8);
+		::SetConsoleOutputCP(CP_UTF8);
 		auto locale = std::locale(".UTF-8");
 		std::wcin.imbue(locale);
 		std::wcout.imbue(locale);
@@ -180,6 +191,9 @@ struct Stdio
 bool Stdio::isConsoleStdin = false;
 bool Stdio::isConsoleStdout = false;
 bool Stdio::isConsoleStderr = false;
+
+UINT Stdio::consoleCP = 0;
+UINT Stdio::consoleOutputCP = 0;
 
 NCB_ATTACH_CLASS(Stdio, System) {
 	Property("stdioState", &Stdio::getState, 0);
