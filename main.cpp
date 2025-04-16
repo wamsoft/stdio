@@ -45,7 +45,7 @@ struct Stdio
 											tjs_int numparams,
 											tTJSVariant **param,
 											iTJSDispatch2 *objthis) {
-		int state = numparams > 0 ? *param[0] : 0;
+		int state = numparams > 0 ? (int)(tTVInteger)(*param[0]) : 0;
 		bool ret = true;
 		if (state == 0) {
 			//VS2012以降でこの記述で正しく判定できない。ランタイムのバグと思われる
@@ -84,7 +84,7 @@ struct Stdio
 										   tjs_int numparams,
 										   tTJSVariant **param,
 										   iTJSDispatch2 *objthis) {
-		int state = numparams > 0 ? *param[0] : 0;
+		int state = numparams > 0 ? (int)(tTVInteger)(*param[0]) : 0;
 		bool ret = true;
 		if (state == 0) {
 			if (_fileno(stdin)  == -2) state |= 0x01;
